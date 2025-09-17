@@ -1,0 +1,3 @@
+# requirements.txt for FAISS Lambda Layer
+faiss-cpu==1.7.4
+numpy

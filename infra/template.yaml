@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2020-10-31
+Description: pai-Personal AI Knowledge Platform (RAG-based)
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.13
+    MemorySize: 512
+    Environment:
+      Variables:
+        REGION: ap-south-1
+
+Resources:
+  paiApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+
+  paiUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: pai-user-pool
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: true
+          RequireSymbols: false
+
+  paiUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref paiUserPool
+      ClientName: pai-user-pool-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  paiUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pai-upload
+      Handler: upload.lambda_handler
+      CodeUri: ../backend/upload/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3CrudPolicy:
+            BucketName: !Ref paiS3Bucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref paiDynamoDBTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:pai-gemini-api-key*'
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref paiS3Bucket
+          DYNAMODB_TABLE: !Ref paiDynamoDBTable
+          GEMINI_API_KEY: "{{resolve:secretsmanager:pai-gemini-api-key:SecretString:GEMINI_API_KEY}}"
+      Layers:
+        - !Ref paiFaissLayer
+      Events:
+        UploadApi:
+          Type: HttpApi
+          Properties:
+            Path: /upload
+            Method: POST
+            ApiId: !Ref paiApi
+
+  paiS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: pai-pdf-storage
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  paiDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: pai-embeddings-metadata
+      AttributeDefinitions:
+        - AttributeName: doc_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: doc_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+
+  paiQueryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pai-query
+      Handler: query.lambda_handler
+      CodeUri: ../backend/query/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBReadPolicy:
+            TableName: !Ref paiDynamoDBTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:pai-gemini-api-key*'
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref paiDynamoDBTable
+          GEMINI_API_KEY: "{{resolve:secretsmanager:pai-gemini-api-key:SecretString:GEMINI_API_KEY}}"
+      Layers:
+        - !Ref paiFaissLayer
+      Events:
+        QueryApi:
+          Type: HttpApi
+          Properties:
+            Path: /query
+            Method: POST
+            ApiId: !Ref paiApi
+
+  paiFaissLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: pai-faiss-layer
+      Description: FAISS for vector search (Python 3.13)
+      ContentUri: ../backend/layer-faiss/
+      CompatibleRuntimes:
+        - python3.13
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${paiApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  CognitoUserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref paiUserPool
+  CognitoUserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref paiUserPoolClient
+  S3BucketName:
+    Description: "S3 bucket for PDF storage"
+    Value: !Ref paiS3Bucket
+  DynamoDBTableName:
+    Description: "DynamoDB table for embeddings and metadata"
+    Value: !Ref paiDynamoDBTable
+  QueryFunctionName:
+    Description: "Lambda function for querying documents"
+    Value: !Ref paiQueryFunction

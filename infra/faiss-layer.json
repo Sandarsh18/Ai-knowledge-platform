@@ -1,0 +1,14 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "paiFaissLayer": {
+      "Type": "AWS::Serverless::LayerVersion",
+      "Properties": {
+        "LayerName": "pai-faiss-layer",
+        "Description": "FAISS for vector search (Python 3.12)",
+        "ContentUri": "../backend/layer-faiss/",
+        "CompatibleRuntimes": ["python3.12"]
+      }
+    }
+  }
+}

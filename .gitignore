@@ -1,0 +1,89 @@
+# Sensitive Data - Never commit these
+*.env
+.env*
+**/secrets.json
+**/credentials.json
+**/*key*
+**/*secret*
+**/*password*
+**/config.json
+
+# AWS Lambda deployment files
+*.zip
+upload.zip
+query.zip
+*-debug.zip
+
+# Node modules and dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# React build files
+frontend/build/
+frontend/dist/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# AWS SAM build artifacts
+infra/.aws-sam/
+.aws-sam/
+
+# Log files
+*.log
+logs/
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Large binary files
+*.pdf
+*.zip
+*.tar.gz
+*.rar
+
+# Specific sensitive files for this project
+cognito-idp*
+create-deployment-user.sh
+setup-iam.sh
+iam-roles.yaml
+sam-*-policy.json
+upload.zip
+pai-faiss-layer/
+test-upload-fix.js
+fix_document.py
+'cognito-idp create-user-pool '
+'e=false,RequireLowercase=false,RequireNumbers=true,RequireSymbols=false}'\'' '
+
+# Environment specific configs
+frontend/.env
+backend/**/.env
+infra/.env
