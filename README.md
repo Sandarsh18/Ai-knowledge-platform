@@ -13,6 +13,10 @@
 
 </div>
 
+## 📝 Project Description
+
+**An AI-powered Document Q&A platform built with React and AWS Serverless.** Users can upload documents, which are stored in S3 and embedded into DynamoDB. They can then ask questions, and the system retrieves relevant chunks and answers using the Gemini API. Authentication is managed with Cognito, APIs are exposed via API Gateway, and the backend runs on Lambda functions. Deployment is fully automated via AWS CLI and SAM, with verification and troubleshooting built-in.
+
 ---
 
 ## 📋 Table of Contents
