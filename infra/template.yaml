@@ -85,6 +85,66 @@ Resources:
             Method: POST
             ApiId: !Ref paiApi
 
+  paiPresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pai-presigned-url
+      Handler: presigned_url.lambda_handler
+      CodeUri: ../backend/presigned-url/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3CrudPolicy:
+            BucketName: !Ref paiS3Bucket
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref paiS3Bucket
+      Events:
+        PresignedUrlApi:
+          Type: HttpApi
+          Properties:
+            Path: /presigned-url
+            Method: POST
+            ApiId: !Ref paiApi
+
+  paiProcessUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pai-process-upload
+      Handler: process_upload.lambda_handler
+      CodeUri: ../backend/process-upload/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3CrudPolicy:
+            BucketName: !Ref paiS3Bucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref paiDynamoDBTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:pai-gemini-api-key*'
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref paiS3Bucket
+          DYNAMODB_TABLE: !Ref paiDynamoDBTable
+          GEMINI_API_KEY: "{{resolve:secretsmanager:pai-gemini-api-key:SecretString:GEMINI_API_KEY}}"
+      Layers:
+        - !Ref paiFaissLayer
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref paiS3Bucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+                  - Name: suffix
+                    Value: .pdf
+
   paiS3Bucket:
     Type: AWS::S3::Bucket
     Properties:

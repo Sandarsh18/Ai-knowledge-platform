@@ -67,3 +67,99 @@ npm start
 - **Frontend**: React with Cognito integration
 
 The platform is fully functional once deployed! 🚀
+
+---
+
+## 🗑️ CLEANUP GUIDE - Delete All Resources
+
+**WARNING: This will permanently delete all your data and resources!**
+
+### Method 1: Delete CloudFormation Stack (Recommended)
+```bash
+# Delete the main stack (this removes most resources automatically)
+aws cloudformation delete-stack --stack-name pai-stack --region ap-south-1
+
+# Wait for deletion to complete
+aws cloudformation wait stack-delete-complete --stack-name pai-stack --region ap-south-1
+```
+
+### Method 2: Manual Resource Cleanup (If stack deletion fails)
+
+#### 1. Empty and Delete S3 Bucket:
+```bash
+# Empty the bucket first
+aws s3 rm s3://pai-pdf-storage --recursive
+
+# Delete the bucket
+aws s3 rb s3://pai-pdf-storage
+```
+
+#### 2. Delete DynamoDB Table:
+```bash
+aws dynamodb delete-table --table-name pai-embeddings-metadata --region ap-south-1
+```
+
+#### 3. Delete Cognito User Pool:
+```bash
+# Get User Pool ID
+aws cognito-idp list-user-pools --max-results 20 --query 'UserPools[?Name==`pai-user-pool`].Id' --output text
+
+# Delete User Pool (replace with actual ID)
+aws cognito-idp delete-user-pool --user-pool-id ap-south-1_ig4KDvu8u --region ap-south-1
+```
+
+#### 4. Delete Lambda Functions:
+```bash
+aws lambda delete-function --function-name pai-upload --region ap-south-1
+aws lambda delete-function --function-name pai-query --region ap-south-1
+aws lambda delete-function --function-name pai-presigned-url --region ap-south-1
+aws lambda delete-function --function-name pai-process-upload --region ap-south-1
+```
+
+#### 5. Delete API Gateway:
+```bash
+# List APIs to get the ID
+aws apigatewayv2 get-apis --query 'Items[?Name==`pai-api`].ApiId' --output text
+
+# Delete API (replace with actual ID)
+aws apigatewayv2 delete-api --api-id <API-ID> --region ap-south-1
+```
+
+#### 6. Delete IAM Roles (Created by CloudFormation):
+```bash
+# List and delete pai-related roles
+aws iam list-roles --query 'Roles[?contains(RoleName, `pai`)].RoleName' --output text
+# Then delete each role manually or let CloudFormation handle it
+```
+
+#### 7. Delete Secrets Manager Secret:
+```bash
+aws secretsmanager delete-secret --secret-id pai-gemini-api-key --force-delete-without-recovery --region ap-south-1
+```
+
+#### 8. Delete SAM Deployment Bucket:
+```bash
+# Find SAM bucket
+aws s3 ls | grep sam-cli-managed
+
+# Empty and delete (replace with actual bucket name)
+aws s3 rm s3://aws-sam-cli-managed-default-samclisourcebucket-xxx --recursive
+aws s3 rb s3://aws-sam-cli-managed-default-samclisourcebucket-xxx
+```
+
+### Verify Cleanup:
+```bash
+# Check CloudFormation stacks
+aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE
+
+# Check S3 buckets
+aws s3 ls | grep pai
+
+# Check DynamoDB tables
+aws dynamodb list-tables --query 'TableNames[?contains(@, `pai`)]'
+
+# Check Lambda functions
+aws lambda list-functions --query 'Functions[?contains(FunctionName, `pai`)].FunctionName'
+```
+
+**Note**: Method 1 (CloudFormation stack deletion) is recommended as it automatically handles dependencies and removes most resources safely.

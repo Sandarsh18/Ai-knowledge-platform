@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "pai-stack"
+s3_bucket = "pai-pdf-storage-1758278928"
+s3_prefix = "pai-stack"
+region = "ap-south-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = []

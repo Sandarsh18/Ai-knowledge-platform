@@ -24,42 +24,54 @@ export default function Upload() {
     }
 
     setUploading(true);
-    setMessage('Uploading...');
+    setMessage('Preparing upload...');
 
-        try {
-            console.log('Starting upload...', { fileName: file.name, fileSize: file.size });
-            console.log('API URL:', process.env.REACT_APP_API_URL);
-            console.log('Token exists:', !!token);
-            
-            const formData = await file.arrayBuffer();
-            console.log('File buffer size:', formData.byteLength);
-            
-            // Add the filename and auth as query parameters to avoid preflight
-            const uploadUrl = `${process.env.REACT_APP_API_URL}/upload?filename=${encodeURIComponent(file.name)}&auth=${encodeURIComponent(token)}`;
-            
-            const res = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/pdf',
-                },
-                body: new Uint8Array(formData),
-            });
-            
-            console.log('Response status:', res.status);
-            console.log('Response headers:', res.headers);      if (!res.ok) {
-        if (res.status === 401) {
+    try {
+      console.log('Starting upload...', { fileName: file.name, fileSize: file.size });
+      console.log('API URL:', process.env.REACT_APP_API_URL);
+      console.log('Token exists:', !!token);
+      
+      // Step 1: Get presigned URL
+      setMessage('Getting upload URL...');
+      const presignedUrl = `${process.env.REACT_APP_API_URL}/presigned-url?filename=${encodeURIComponent(file.name)}&auth=${encodeURIComponent(token)}`;
+      
+      const presignedRes = await fetch(presignedUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!presignedRes.ok) {
+        if (presignedRes.status === 401) {
           setMessage('Authentication failed. Please login again.');
           localStorage.removeItem('token');
           navigate('/login');
           return;
         }
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        throw new Error(`Failed to get upload URL: HTTP ${presignedRes.status}`);
       }
-
-      const data = await res.json();
-      console.log('Upload response data:', data);
-      console.log('Received doc_id:', data.doc_id);
-      setMessage(`Upload successful! Document ID: ${data.doc_id}`);
+      
+      const presignedData = await presignedRes.json();
+      console.log('Presigned URL response:', presignedData);
+      
+      // Step 2: Upload directly to S3
+      setMessage('Uploading to S3...');
+      const s3Response = await fetch(presignedData.upload_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/pdf',
+        },
+        body: file
+      });
+      
+      if (!s3Response.ok) {
+        throw new Error(`S3 upload failed: HTTP ${s3Response.status}`);
+      }
+      
+      console.log('S3 upload successful');
+      setMessage(`Upload successful! Document ID: ${presignedData.doc_id}. Processing in background...`);
+      
     } catch (error) {
       console.error('Upload error details:', error);
       console.error('Error type:', error.constructor.name);
@@ -195,7 +207,7 @@ export default function Upload() {
                     Click to browse or drag & drop
                   </div>
                   <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                    PDF files only • Max 10MB
+                    PDF files only • Up to 100MB supported
                   </div>
                 </div>
               )}
